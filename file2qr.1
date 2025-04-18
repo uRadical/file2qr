@@ -1,0 +1,99 @@
+.TH FILE2QR 1 "April 2025" "file2qr 1.0.0" "User Commands"
+.SH NAME
+file2qr \- convert files to QR codes
+.SH SYNOPSIS
+.B file2qr
+[\fIOPTIONS\fR] [\fIFILE\fR]
+.SH DESCRIPTION
+.B file2qr
+converts files to QR codes. It can read data from a file or from standard input,
+and can output the QR code as a PNG image or display it directly in the terminal.
+.PP
+When reading from standard input,
+.B file2qr
+can be used in a pipeline, allowing operations like:
+.PP
+.B cat archive.zip | file2qr
+.SH OPTIONS
+.TP
+.BR \-o ", " \-\-output =\fIFILE\fR
+Write QR code to FILE in PNG format instead of displaying it in the terminal.
+.TP
+.BR \-s ", " \-\-size =\fIPIXELS\fR
+Set the size of the QR code image in pixels (default: 256).
+.TP
+.BR \-r ", " \-\-recovery =\fILEVEL\fR
+Set QR code error correction level (default: medium).
+Valid values: low, medium, high, highest.
+.TP
+.BR \-t ", " \-\-term\-size =\fISIZE\fR
+Set the size of the QR code when displayed in terminal (default: 40).
+.TP
+.BR \-b ", " \-\-base64
+Encode content using Base64 (recommended for binary files).
+.TP
+.BR \-h ", " \-\-help
+Display help message and exit.
+.TP
+.BR \-v ", " \-\-version
+Display version information and exit.
+.SH INPUT
+If FILE is specified,
+.B file2qr
+reads data from that file. Otherwise, it reads from standard input.
+.SH OUTPUT
+If \-o/\-\-output is specified,
+.B file2qr
+writes the QR code to the specified file in PNG format. Otherwise, it displays the QR code
+directly in the terminal.
+.PP
+Terminal output requires a terminal that supports:
+.IP \[bu] 2
+24-bit color (true color)
+.IP \[bu]
+Unicode block characters
+.SH CAPACITY LIMITATIONS
+QR codes have inherent capacity limitations:
+.IP \[bu] 2
+For raw text data: approximately 2900 characters maximum
+.IP \[bu]
+For binary data using Base64 encoding: approximately 2100 bytes maximum
+.SH EXAMPLES
+.PP
+Generate a QR code from a text file and display it in the terminal:
+.PP
+.B file2qr message.txt
+.PP
+Generate a QR code from a binary file and save it as PNG:
+.PP
+.B file2qr \-b \-o archive\-qr.png archive.zip
+.PP
+Read from standard input and display in terminal:
+.PP
+.B echo "Hello, world!" | file2qr
+.PP
+Create a QR code with high error correction:
+.PP
+.B file2qr \-r high \-o secure\-qr.png secrets.txt
+.SH EXIT STATUS
+.TP
+.B 0
+Success
+.TP
+.B 1
+Error (file not found, invalid parameters, etc.)
+.SH AUTHOR
+file2qr contributors
+.SH REPORTING BUGS
+Report bugs to: https://github.com/username/file2qr/issues
+.SH COPYRIGHT
+Copyright \(co 2025 file2qr contributors.
+.br
+License GPLv3+: GNU GPL version 3 or later <https://gnu.org/licenses/gpl.html>.
+.br
+This is free software: you are free to change and redistribute it.
+.br
+There is NO WARRANTY, to the extent permitted by law.
+.SH SEE ALSO
+.BR qrencode (1),
+.BR zbarimg (1)
