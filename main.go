@@ -23,6 +23,7 @@ import (
 	"flag"
 	"fmt"
 	"image"
+	"image/color"
 	"io"
 	"os"
 	"strings"
@@ -36,60 +37,82 @@ const (
 	ProgramName = "file2qr"
 )
 
-// displayImageInTerminal shows an image directly in the terminal
-func displayImageInTerminal(img image.Image) {
+// displayQRCodeInTerminal creates a temporary PNG file and displays it using terminal graphics
+func displayQRCodeInTerminal(qrImage *qrcode.QRCode, size int) error {
+	// Create a temporary file
+	tmpFile, err := os.CreateTemp("", "file2qr-*.png")
+	if err != nil {
+		return fmt.Errorf("failed to create temporary file: %v", err)
+	}
+	tmpPath := tmpFile.Name()
+	tmpFile.Close()
+
+	// Clean up when done
+	defer os.Remove(tmpPath)
+
+	// Write QR code to the temporary file
+	err = qrImage.WriteFile(size, tmpPath)
+	if err != nil {
+		return fmt.Errorf("failed to write QR code to temporary file: %v", err)
+	}
+
+	// Open the temporary image file
+	f, err := os.Open(tmpPath)
+	if err != nil {
+		return fmt.Errorf("failed to open temporary QR code file: %v", err)
+	}
+	defer f.Close()
+
+	// Decode the image
+	img, _, err := image.Decode(f)
+	if err != nil {
+		return fmt.Errorf("failed to decode QR code image: %v", err)
+	}
+
 	// Get image dimensions
 	bounds := img.Bounds()
 
-	// Ensure the bounds are non-empty
-	if bounds.Dx() <= 0 || bounds.Dy() <= 0 {
-		fmt.Fprintf(os.Stderr, "Error: Image has invalid dimensions\n")
-		return
-	}
+	// Add some padding around the QR code
+	fmt.Println()
 
-	// Calculate padding to ensure the QR code is square in the terminal
-	// Since terminal characters are usually taller than wide, we need
-	// to add some horizontal spacing to make the QR code square
-	const horizontalPadding = "  " // Two spaces for horizontal padding
-
-	// Print top padding line to visually frame the QR code
-	fmt.Print("\n") // Extra line for visual separation
-
-	// Print the QR code using blocks
+	// Loop through the image two rows at a time
 	for y := bounds.Min.Y; y < bounds.Max.Y-1; y += 2 {
-		fmt.Print(horizontalPadding) // Start padding
+		// Add some left padding
+		fmt.Print("  ")
+
 		for x := bounds.Min.X; x < bounds.Max.X; x++ {
 			// Get the colors of the top and bottom pixels in this column
 			top := img.At(x, y)
 			bottom := img.At(x, y+1)
 
-			// For QR codes, we only care if a pixel is set or not
-			// This simplifies the output and ensures consistent appearance
-			_, _, _, topAlpha := top.RGBA()
-			_, _, _, bottomAlpha := bottom.RGBA()
+			// Convert both colors to 8-bit RGB values
+			r1, g1, b1 := rgb(top)
+			r2, g2, b2 := rgb(bottom)
 
-			// QR codes have black/white pixels, so we can use simple block characters
-			// This creates a more scannable QR code in the terminal
-			if topAlpha > 0 && bottomAlpha > 0 {
-				// Both pixels are black
-				fmt.Print("█") // Full block
-			} else if topAlpha > 0 {
-				// Only top pixel is black
-				fmt.Print("▀") // Upper half block
-			} else if bottomAlpha > 0 {
-				// Only bottom pixel is black
-				fmt.Print("▄") // Lower half block
-			} else {
-				// Both pixels are white
-				fmt.Print(" ") // Space (empty)
-			}
+			// Set foreground color (top pixel)
+			fmt.Printf("\x1b[38;2;%d;%d;%dm", r1, g1, b1)
+
+			// Set background color (bottom pixel)
+			fmt.Printf("\x1b[48;2;%d;%d;%dm", r2, g2, b2)
+
+			// Print the "upper half block" character
+			fmt.Print("▀")
 		}
-		fmt.Print(horizontalPadding) // End padding
-		fmt.Print("\n")
+
+		// Reset colors and move to the next terminal line
+		fmt.Print("\x1b[0m\n")
 	}
 
-	// Print bottom padding line to frame the QR code
-	fmt.Print("\n") // Extra line for visual separation
+	// Add some bottom padding
+	fmt.Println()
+
+	return nil
+}
+
+// rgb converts a color.Color into standard 8-bit RGB values (0–255 per channel)
+func rgb(c color.Color) (r, g, b uint8) {
+	rr, gg, bb, _ := c.RGBA()                             // Returns 16-bit (0–65535) values
+	return uint8(rr >> 8), uint8(gg >> 8), uint8(bb >> 8) // Convert to 8-bit
 }
 
 // readFromStdin reads all data from standard input
@@ -224,21 +247,15 @@ func main() {
 	} else {
 		// Output to terminal
 		if isTerminal(os.Stdout.Fd()) {
-			displayImageInTerminal(qrImage.Image(*terminalSize))
+			err := displayQRCodeInTerminal(qrImage, *terminalSize)
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "Error displaying QR code: %v\n", err)
+				os.Exit(1)
+			}
 		} else {
 			// If stdout is not a terminal, we can't display the image visually
 			fmt.Fprintf(os.Stderr, "Error: Output is not a terminal. Use -o/--output to specify an output file.\n")
 			os.Exit(1)
-		}
-	}
-
-	// Print file statistics if stderr is a terminal
-	if isTerminal(os.Stderr.Fd()) {
-		if *base64Flag {
-			fmt.Fprintf(os.Stderr, "Original data size: %d bytes\n", len(inputData))
-			fmt.Fprintf(os.Stderr, "Base64 encoded size: %d characters\n", len(qrContent))
-		} else {
-			fmt.Fprintf(os.Stderr, "Data size: %d bytes\n", len(inputData))
 		}
 	}
 }
