@@ -31,7 +31,7 @@ import (
 	"github.com/skip2/go-qrcode"
 )
 
-const VERSION = "1.0.0"
+var VERSION = "dev"
 
 const (
 	ProgramName = "file2qr"
